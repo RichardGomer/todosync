@@ -1,0 +1,37 @@
+{
+    "version": "1.0",
+    "todofile": "/home/richard/.todo-txt/todo.txt",
+    "donefile": "/home/richard/.todo-txt/done.txt",
+    "sources": [
+        {
+            "id": "local-txt",
+            "type": "TodoTxtSource",
+            "options": {
+                "filename": "/home/richard/todo.txt"
+            },
+            "default": true
+        },
+        {
+            "id": "kolola-rcg",
+            "type": "KololaSource",
+            "options": {
+                "domain": "rcg.impactrecord.co.uk",
+                "query": "evidence:1=In Progress",
+                "key": "",
+                "status_uri": "http://rcg.impactrecord.co.uk/_records/01/_intxv1/evidence/EvidenceID/1",
+                "due_uri": false
+            }
+        },
+        {
+            "id": "kolola-qrowd",
+            "type": "KololaSource",
+            "options": {
+                "domain": "qrowd.impactrecord.co.uk",
+                "query": "evidence:2=Outstanding",
+                "key": "",
+                "status_uri": "http://qrowd.impactrecord.co.uk/_records/01/_intxv1/evidence/EvidenceID/2",
+                "due_uri": "http://qrowd.impactrecord.co.uk/_records/01/_intxv1/evidence/EvidenceID/1"
+            }
+        }
+    ]
+}

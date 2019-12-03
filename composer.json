@@ -1,0 +1,17 @@
+{
+    "name": "richardgomer/todosync",
+    "description": "A tool for mapping multiple todo sources into a todo.txt file\u001b[D",
+    "type": "project",
+    "require": {
+        "gravitask/task": "^0.1.0",
+        "galbar/jsonpath": "dev-master",
+        "diff/diff": "~3.0",
+        "sabre/dav": "~3.2.0"
+    },
+    "authors": [
+        {
+            "name": "Richard Gomer",
+            "email": "richard@xebre.net"
+        }
+    ]
+}

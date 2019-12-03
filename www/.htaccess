@@ -1,0 +1,7 @@
+RewriteEngine On
+RewriteRule (.*) /dav.php [L]
+
+AuthType Basic
+AuthName "todosync"
+AuthUserFile .htpasswd
+Require valid-user
