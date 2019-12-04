@@ -1,7 +1,8 @@
 RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule (.*) /dav.php [L]
 
 AuthType Basic
 AuthName "todosync"
-AuthUserFile .htpasswd
+AuthUserFile /home/richard/public_html/todosync/www/.htpasswd
 Require valid-user
