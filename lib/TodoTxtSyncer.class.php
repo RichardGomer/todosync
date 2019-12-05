@@ -49,7 +49,7 @@ class TodoTxtSyncer extends Syncer {
             }
 
             if($moved) {
-                echo \basename($filename)." has been recreated; syncing contents & updating handle\n";
+                echo date('H:i:s ').\basename($filename)." has been recreated; syncing contents & updating handle\n";
 
                 // Sync changes from the old file before closing it
                 $tasks = $file->readChanges();
@@ -64,7 +64,7 @@ class TodoTxtSyncer extends Syncer {
             }
 
             if($changed) {
-                echo "Changes detected\n";
+                echo date('H:i:s')." Changes detected\n";
                 $tasks = $file->readChanges();
                 $this->push($tasks);
             }
@@ -90,15 +90,16 @@ class TodoTxtSyncer extends Syncer {
 
         while(true) {
 
-            sleep(5);
+            usleep(100000); // Sleep for 100ms
 
             $this->handleChanges($in_done, $this->donefilename, $this->donefile);
             $this->handleChanges($in_todo, $this->todofilename, $this->todofile);
 
             // Periodically update the local file with remote changes
             if(time() - $lastupdate > 120) {
-                echo "Syncing remote changes\n";
+                echo date('H:i:s')." Syncing remote changes\n";
                 $this->updateFile($this->todofile);
+                $lastupdate = time();
             }
 
         }

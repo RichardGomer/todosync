@@ -15,24 +15,58 @@ require '../lib/loadconfig.php';
 
 class TodoDir extends DAV\Collection {
 
-    public function __construct($todopath) {
+    public function __construct($todopath, $donepath) {
         $this->todofile = $todopath;
+        $this->donefile = $donepath;
     }
 
     function getChildren() {
-        return array(new TodoFile($this->todofile));
+        return array(   new TodoFile($this->todofile, 'todo.txt'),
+                        new TodoFile($this->donefile, 'done.txt'));
+    }
+
+    function createFile($name, $data = null) {
+
+        if(preg_match('/\.tacitpart$/', $name)) {
+            $fpath = dirname(__FILE__).'/temp/'.$name;
+            touch($fpath);
+        }
+
+        $f = $this->getChild($name);
+        $f->put($data);
     }
 
     function getChild($name) {
-        if($name !== 'todo.txt') {
-            throw new DAV\Exception\NotFound('Access denied');
+
+        // Temp files get called .tacitfile by
+        if(preg_match('/\.tacitpart$/', $name)) {
+            $fpath = dirname(__FILE__).'/temp/'.$name;
+
+            if(file_exists($fpath)) {
+                return new DAV\FS\File($fpath);
+            } else {
+                throw new DAV\Exception\NotFound("Temp file $name does not exist");
+            }
         }
 
-        return new TodoFile($this->todofile);
+        if($name == 'todo.txt') {
+            return new TodoFile($this->todofile, 'todo.txt');
+        }
+        else if($name == 'done.txt') {
+            return new TodoFile($this->donefile, 'done.txt');
+        }
+        else {
+            throw new DAV\Exception\NotFound("Invalid file name $name");
+        }
     }
 
     function childExists($name) {
-        return $name == 'todo.txt';
+        try {
+            $this->getChild($name);
+            return true;
+        } catch (DAV\Exception\NotFound $e) {
+            return false;
+        }
     }
 
     function getName() {
@@ -42,20 +76,20 @@ class TodoDir extends DAV\Collection {
 
 class TodoFile extends DAV\File {
 
-    public function __construct($path) {
+    public function __construct($path, $name) {
         $this->path = $path;
+        $this->name = $name;
     }
 
     function getName() {
-        return "todo.txt";
+        return $this->name;
     }
 
     function get() {
         return fopen($this->path,'r');
     }
 
-    function put($stream) {
-        $data = stream_get_contents();
+    function put($data) {
         file_put_contents($this->path, $data);
     }
 
@@ -67,19 +101,50 @@ class TodoFile extends DAV\File {
         return '"' . md5_file($this->path) . '"';
     }
 
+    function delete() {
+        return true;
+    }
+
+    function getLastModified() {
+        return filemtime($this->path);
+    }
+
 }
 
 
 // Expose the todo file using our virtual filesystem
-$publicDir = new TodoDir($conf['todofile']);
+$publicDir = new TodoDir($conf['todofile'], $conf['donefile']);
 $server = new DAV\Server($publicDir);
 
-
+// Nice browser UI
 $plugin = new DAV\Browser\Plugin();
 $server->addPlugin($plugin);
+
+// File locking
+$locksBackend = new DAV\Locks\Backend\File(dirname(__FILE__).'/davlocks');
+$locksPlugin = new DAV\Locks\Plugin($locksBackend);
+$server->addPlugin($locksPlugin);
+
 
 // Base URI assumes rewriting is configured so that all requests go to /dav.php
 $server->setBaseUri('/');
 
 // Handle the request
+ob_start();
 $server->exec();
+sleep(1); // Time for sync process to process changes
+// TODO: Wait for some kind of confirmation?
+ob_end_flush();
+
+// Because of our hybrid virtual-real filesystem, we can end up with todo.txt and done.txt
+// existing in the temp directory (after being renamed from tempfile uploads)
+// We need to jusy copy them across and clean up
+foreach(scandir('temp') as $tf) {
+	//echo "TIDY $tf\n";
+	if($tf == 'done.txt' || $tf == 'todo.txt') {
+		$f = $publicDir->getChild($tf)->put(file_get_contents("temp/$tf"));
+	}
+
+	if(time() - filemtime("temp/$tf") > 60) // Remove old files (i.e. not while a client might be using them!)
+		unlink("temp/$tf");
+}

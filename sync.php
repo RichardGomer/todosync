@@ -48,6 +48,7 @@ foreach($conf['sources'] as $s) {
     }
 }
 
+echo date('H:i:s ')."Sync daemon started\n";
 echo "Tasks are in ".getcwd()."/todo.txt\n";
 
 // TODO: Probably want to implement process control stuff to catch signals

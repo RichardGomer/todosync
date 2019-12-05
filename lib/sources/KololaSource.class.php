@@ -95,16 +95,26 @@ class KololaSource implements Source {
 
     // Fetch the remote records into our local cache
     private $tasks = array();
+    private $lastsync = 0;
     protected function refresh() {
         $set = new KOLOLAIntxSet($this->opts);
         $this->tasks = $set->getTasks();
+	$this->lastsync = time();
+    }
+
+    public function refreshIfStale() {
+	if(time() - $this->lastsync > 120) {
+		$this->refresh();
+	}
     }
 
     public function getAll() {
+	$this->RefreshIfStale();
         return $this->tasks;
     }
 
     public function get($id) {
+	$this->refreshIfStale();
         if(array_key_exists($id, $this->tasks)) {
             return $this->tasks[$id];
         }

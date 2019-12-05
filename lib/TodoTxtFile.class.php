@@ -95,7 +95,7 @@ class TodoTxtFile {
         return $this->convert($clines);
     }
 
-    private $lastwrite = array();
+    private $lastwrite = false;
     public function write($tasks, $strip=array()) {
         $unlock = $this->lock();
 
@@ -103,6 +103,13 @@ class TodoTxtFile {
         $txt = array();
         foreach($tasks as $i=>$t) {
             $txt[] = $line = trim($f->format($t, null, $strip));
+        }
+
+        // If there are no changes in the file contents, just return
+        if($txt == $this->lastwrite)
+        {
+            $this->unlock();
+            return;
         }
 
         $this->lastwrite = $txt; // Cache the last value for diff'ing later on
