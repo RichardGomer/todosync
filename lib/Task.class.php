@@ -39,6 +39,10 @@ class Task extends TaskItem {
         return $nt;
     }
 
+    public function isCompleted() {
+	return $this->getStatus() == TaskItem::STATUS_COMPLETED;
+    }
+
 
     private $raw = null;
     public function getRaw() {

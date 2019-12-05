@@ -103,3 +103,13 @@ Android:
 * Install Tasker
 * Use tasker to run the job TWICE on a schedule. First sync pushes, second sync pulls the updated list back (i.e. with IDs on newly added tasks).
 * Use Simpletask Cloudless to view/edit todo.txt
+
+
+The extra attributes can be a bit messy in the command line client; set up a function 
+in bashrc (or similar) to filter them out of the terminal output!
+
+```
+function td () {
+    todo-txt "$@" | sed -e "s/\(xsid\|xssrc\):[a-zA-Z0-9-]\+//g"
+}
+```

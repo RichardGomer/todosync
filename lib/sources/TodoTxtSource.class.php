@@ -73,7 +73,16 @@ class TodoTxtSource implements Source {
      * These methods all work on the in-memory task list
      */
     public function getAll() {
-        return $this->tasks;
+
+	$out = array();
+
+	// Hide hidden tasks
+	foreach($this->tasks as $t) {
+	    if(!$t->isCompleted()) 
+		$out[] = $t;
+	}
+
+        return $out;
     }
 
     public function get($id) {
@@ -92,6 +101,13 @@ class TodoTxtSource implements Source {
     }
 
     public function create(Task $task) {
+
+	// Avoid creating duplicates - this can happen before clients pick up a fresh list with an ID assigned
+	foreach($this->tasks as $t) {
+		if($t->getTask() == $t->getTask())
+			return;
+	}
+
         $id = uniqid(); // Create an ID
         $task->addMetadata(Syncer::METAIDFIELD, $id);
         $this->tasks[$id] = $task;

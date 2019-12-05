@@ -31,7 +31,15 @@ class TodoTxtSyncer extends Syncer {
     public function updateFile($file) {
         $tasks = $this->getAll();
         $file->write($tasks);
+	$this->lastUpdate = time();
     }
+
+    protected function updateIfStale($file) {
+	if(time() - $this->lastUpdate > 120) {
+		$this->updateFile($file);
+	}
+    }
+   
 
     private function handleChanges($inotify, $filename, $file) {
 
@@ -67,6 +75,7 @@ class TodoTxtSyncer extends Syncer {
                 echo date('H:i:s')." Changes detected\n";
                 $tasks = $file->readChanges();
                 $this->push($tasks);
+		$this->updateFile($file); // Push the changes back
             }
 
             inotify_read($inotify); // Discard any events we triggered ourselves!
@@ -95,12 +104,8 @@ class TodoTxtSyncer extends Syncer {
             $this->handleChanges($in_done, $this->donefilename, $this->donefile);
             $this->handleChanges($in_todo, $this->todofilename, $this->todofile);
 
-            // Periodically update the local file with remote changes
-            if(time() - $lastupdate > 120) {
-                echo date('H:i:s')." Syncing remote changes\n";
-                $this->updateFile($this->todofile);
-                $lastupdate = time();
-            }
+	    // Also do regular updates to find source updates, regardless of changes to our own files
+	    $this->updateIfStale($this->todofile);
 
         }
 
