@@ -283,9 +283,8 @@ class ExtendedJsonObject extends JsonObject {
         $val = $this->val($val);
 
         if($val === null || $val === false) {
-            echo "$path\n => ";
-            var_dump($val);
-
+            //echo "$path\n => ";
+            //var_dump($val);
         }
 
         return $val;

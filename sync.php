@@ -8,6 +8,7 @@ require 'vendor/autoload.php';
 // Load our local libraries
 require 'lib/Task.class.php';
 require 'lib/TodoTxtFile.class.php';
+require 'lib/DirectoryWatcher.class.php';
 require 'lib/TodoTxtMetadataFormatter.class.php';
 require 'lib/Syncer.class.php';
 require 'lib/TodoTxtSyncer.class.php';
@@ -20,39 +21,53 @@ require 'lib/sources/KololaSource.class.php';
 require 'lib/loadconfig.php';
 
 
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
 
-// Create the syncer
-$syncer = new TodoTxtSyncer($conf['todofile'], $conf['donefile']);
+// create a log channel
+$log = new Logger('todosync');
+$log->pushHandler(new StreamHandler('php://stderr', Logger::DEBUG));
 
-// Add configured sources
-foreach($conf['sources'] as $s) {
-    if(!array_key_exists('id', $s) || !array_key_exists('type', $s)) {
-        echo "All sources must have an id and type\n";
-        exit;
+$log->info("todosync launched");
+
+try {
+
+    // Create the syncer
+    $syncer = new TodoTxtSyncer($conf['todofile'], $conf['donefile'], $conf['postdir'], $log);
+    $syncer->setLogger($log);
+
+    // Add configured sources
+    foreach($conf['sources'] as $s) {
+        if(!array_key_exists('id', $s) || !array_key_exists('type', $s)) {
+            $log->critical("All sources must have an id and type\n");
+            exit;
+        }
+
+        $class = 'RichardGomer\todosync\\'.$s['type'];
+        if(!class_exists($class) || !in_array('RichardGomer\todosync\Source', $imps = class_implements($class))) {
+            $log->critical("Source type {$s['type']} is not defined");
+            print_r($imps);
+            exit;
+        }
+
+        $opts = array_key_exists('options', $s) ? $s['options'] : array();
+
+        $source = $class::factory($opts);
+        $syncer->addSource($s['id'], $source);
+
+        if(array_key_exists('default', $s) && $s['default'] == true) {
+            $syncer->setDefaultSource($source);
+        }
     }
 
-    $class = 'RichardGomer\todosync\\'.$s['type'];
-    if(!class_exists($class) || !in_array('RichardGomer\todosync\Source', $imps = class_implements($class))) {
-        echo "Source type {$s['type']} is not defined\n";
-        print_r($imps);
-        exit;
-    }
+    $log->info("Setup complete");
 
-    $opts = array_key_exists('options', $s) ? $s['options'] : array();
+    // TODO: Probably want to implement process control stuff to catch signals
+    // and exit gracefully
 
-    $source = $class::factory($opts);
-    $syncer->addSource($s['id'], $source);
+    // Run the syncer
+    $syncer->run();
 
-    if(array_key_exists('default', $s) && $s['default'] == true) {
-        $syncer->setDefaultSource($source);
-    }
+} catch (\Exception $e) {
+    $log->critical("todosync has crashed because of an unhandled exception: ".$e->getMessage());
 }
-
-echo date('H:i:s ')."Sync daemon started\n";
-echo "Tasks are in ".getcwd()."/todo.txt\n";
-
-// TODO: Probably want to implement process control stuff to catch signals
-// and exit gracefully
-
-// Run the syncer
-$syncer->run();

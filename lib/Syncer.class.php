@@ -2,13 +2,21 @@
 
 namespace RichardGomer\todosync;
 
+use Psr\Log;
+
 /**
  * The core syncer logic
  */
-class Syncer {
+class Syncer implements Log\LoggerAwareInterface  {
 
     const METASRCFIELD = 'xssrc';
     const METAIDFIELD = 'xsid';
+
+    protected $log;
+    public function setLogger(Log\LoggerInterface $log) {
+        $this->log = $log;
+    }
+
 
     private $default;
     public function setDefaultSource(Source $source) {
@@ -48,16 +56,16 @@ class Syncer {
     /**
      * Get all tasks
      */
-    public function getAll() {
+    public function getAllTasks() {
         $all = array();
 
         foreach($this->sources as $srcid => $s) {
 
-            echo "Fetch tasks from source $srcid\n";
+            $this->log->info("Fetch tasks from source $srcid");
 
             $tasks = $s->getAll();
             if(!is_array($tasks)) {
-                echo "  [ WARN ]  The source did not return an array\n";
+                $this->log->warn("The source '$srcid' did not return an array");
                 continue;
             }
 
@@ -65,7 +73,7 @@ class Syncer {
             foreach($tasks as $t) {
 
                 if(!$t instanceof Task) {
-                    echo "  [ WARN ]  The source returned something that isn't a Task object\n";
+                    $this->log->warn("The source $srcid returned something that isn't a Task object");
                     continue;
                 }
 
@@ -74,7 +82,7 @@ class Syncer {
 
                 // Check that the task has been assigned an ID by the source
                 if(!array_key_exists(self::METAIDFIELD, $t->getMetadata())) {
-                    echo "  [ WARN ]  The source returned a task without an ID, it has been discarded\n";
+                    $this->log->warn("The source '$srcid' returned a task without an ID, it has been discarded");
                     continue;
                 }
 
@@ -82,7 +90,7 @@ class Syncer {
                 $all[] = $t;
             }
 
-            echo "  [ DONE ]  ".$added." tasks added\n";
+            $this->log->info("Got $added tasks from '$srcid'");
         }
 
         return $all;
@@ -94,29 +102,23 @@ class Syncer {
      * of new tasks, to the source specified in the new task's metadata or the
      * default source
      */
-    public function push($tasks) {
-
+    public function pushToSources($tasks) {
         foreach($tasks as $i=>$t) {
-            try {
-                echo "  Push task $i   ";
-                $this->pushTask($t);
-                echo "    [  OK  ]\n    {$t->getRaw()}\n";
-            } catch (\Exception $e) {
-                echo "    [FAILED]   {$e->getMessage()}\n    {$t->getRaw()}\n";
-            }
+                $this->pushTaskToSource($t);
         }
     }
 
-    protected function pushTask(Task $t) {
+    protected function pushTaskToSource(Task $t) {
         // Find the source
         $md = $t->getMetadata();
 
         if(!array_key_exists(self::METASRCFIELD, $md)) {
 
-            //echo "  + New task, default source\n";
+            $this->log->notice("Task has no source ID, creating it in the default source");
 
             if(!$this->getDefault()) {
-                throw new \Exception("There's no default source, new items can't be added");
+                $this->log->warn("There's no default source, new items can't be added");
+                return;
             }
 
             $this->getDefault()->create($t);
@@ -128,19 +130,22 @@ class Syncer {
 
         if (!array_key_exists(self::METAIDFIELD, $md)) {
 
-            //echo "  + New task, source $sid\n";
+            $this->log->notice("Task has source ID, but no task ID, creating a new task in '$sid'");
 
             if(!$source->canCreate()) {
-                throw new \Exception("Cannot create new tasks in source '$sid'");
+                $this->log->warn("Tasks cannot be created in source '$sid'");
+                return;
             }
             $source->create($t);
         } else {
 
             $tid = $md[self::METAIDFIELD];
-            //echo "  + task $tid, source $sid\n";
+
+            echo "  + task $tid, source $sid\n";
 
             if(!$source->canUpdate()) {
-                throw new \Exception("Cannot update tasks in source '$sid'");
+                $this->log->warning("Tasks cannot be updated in source '$sid'");
+                return;
             }
 
             $source->update($tid, $t);

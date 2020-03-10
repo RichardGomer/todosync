@@ -39,3 +39,8 @@ if(!array_key_exists('donefile', $conf)) {
     echo "donefile isn't defined in config.json\n";
     exit;
 }
+
+if(!array_key_exists('postdir', $conf)) {
+    echo "postdir isn't defined in config.json\n";
+    exit;
+}

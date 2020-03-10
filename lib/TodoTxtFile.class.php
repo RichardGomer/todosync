@@ -2,15 +2,18 @@
 
 namespace RichardGomer\todosync;
 
+use Psr\Log;
+
 /**
  * A simple wrapper for working with todo.txt files
  */
-class TodoTxtFile {
+class TodoTxtFile implements Log\LoggerAwareInterface {
 
     private $fh;
-    public function __construct($filehandle) {
-        $this->fh = $filehandle;
+    public function __construct($filename) {
 
+        $this->fn = $filename;
+        $this->getFileHandle();
         $this->lastwrite = $this->readLines();
     }
 
@@ -18,30 +21,98 @@ class TodoTxtFile {
         fclose($this->fh);
     }
 
-    /**
-     * Replace the file handle
-     * This is necessary when, ofr instance, another client moves todo.txt to
-     * todo.txt~ and writes a new todo.txt
-     * Replacing the filehandle rather than e-instantiating a new TodoTxtFile
-     * means that change diff'ing will still work
-     */
-    public function setFile($fh) {
+    public function getFilename() {
+        return $this->fn;
+    }
 
+    protected $log;
+    public function setLogger(Log\LoggerInterface $log) {
+        $this->log = $log;
+    }
+
+    /**
+     * (Re)Acquire the file handle
+     * And set up inotify watches for detecting changes
+     */
+    protected function getFileHandle() {
+
+        $locked = false;
         if($this->isLocked()) {
             $locked = true;
             $this->unlock();
         }
 
-        $this->fh = $fh;
+        $this->fh = fopen($this->fn, 'r+');
+        $this->inotify = inotify_init();
+        $i_write = inotify_add_watch($this->inotify, $this->fn, IN_CLOSE_WRITE | IN_MOVE_SELF);
+        stream_set_blocking($this->inotify, 0);
+
+        if($this->fh === false) {
+            throw new \Exception("Couldn't open {$this->fn}");
+        }
 
         if($locked) {
             $this->lock();
         }
     }
 
-    public function getFile() {
-        return $this->fh;
+
+    /**
+     * Check for changes.
+     * If changes are detected, store them in the change queue.
+     * For efficiency, we use inotify to detect changes and file moves.
+     * In theory, you could do it via polling (inc. checking that the file
+     * hasn't been renamed!)
+     */
+    protected $pendingChanges = array();
+    public function hasChanges() {
+
+        // Do non-blocking checks for file changes
+        $events = inotify_read($this->inotify);
+
+        $moved = false;
+        $changed = false;
+
+        if($events !== false && count($events) > 0) {
+
+            $this->log->debug("inotify events were found on ".\basename($this->fn));
+
+            foreach($events as $e) {
+                $this->log->debug("Event mask: ".$e['mask']);
+                $moved = $moved || (($e['mask'] & IN_MOVE_SELF) > 0);
+                $changed = $changed || (($e['mask'] & IN_CLOSE_WRITE) > 0);
+            }
+        }
+
+        // If the file has moved, read changes then reacquire the file handle
+        // on the new 'live' version
+        if($moved) {
+            $this->log->debug(\basename($this->fn)." has moved");
+            $changes = $this->getChangedLines();
+            $this->pendingChanges = array_merge($this->pendingChanges, $changes);
+            $this->getFileHandle();
+        }
+        // If there are (just) changes, read them
+        else if($changed) {
+            $this->log->debug(\basename($this->fn)." has changed");
+            $changes = $this->getChangedLines();
+            $this->pendingChanges = array_merge($this->pendingChanges, $changes);
+        }
+
+        return count($this->pendingChanges) > 0;
     }
+
+
+    /**
+     * Get any outstanding changes and clear the change queue
+     * You should call hasChanges() to actually poll for changes!
+     */
+    public function getChanges() {
+        $changes = $this->pendingChanges;
+        $this->pendingChanges = array();
+        return $changes;
+    }
+
 
     protected function convert($lines) {
         $tasks = array();
@@ -71,7 +142,7 @@ class TodoTxtFile {
     }
 
     // Read changed lines as Task objects
-    public function readChanges() {
+    protected function getChangedLines() {
         $lines = $this->readLines();
         $last = $this->lastwrite;
         $differ = new \Diff\Differ\ListDiffer();
@@ -88,13 +159,18 @@ class TodoTxtFile {
 
             // TODO: What to do about deleted lines?
             if($d instanceof \Diff\DiffOp\DiffOpRemove) {
-
+                $clines [] = "";
             }
         }
 
         return $this->convert($clines);
     }
 
+
+    /**
+     * Write the given tasks to the file.
+     * Existing tasks are discarded.
+     */
     private $lastwrite = false;
     public function write($tasks, $strip=array()) {
         $unlock = $this->lock();
@@ -105,18 +181,19 @@ class TodoTxtFile {
             $txt[] = $line = trim($f->format($t, null, $strip));
         }
 
-        // If there are no changes in the file contents, just return
-        if($txt == $this->lastwrite)
-        {
-            $this->unlock();
-            return;
+        if($this->hasChanges()) {
+            throw new \Exception("Won't write() to {$this->fn} - there are outstanding changes");
         }
 
-        $this->lastwrite = $txt; // Cache the last value for diff'ing later on
+        // If there are no changes in the file contents, just return
+        if($txt !== $this->lastwrite)
+        {
+            $this->lastwrite = $txt; // Cache the last value for diff'ing later on
 
-        ftruncate($this->fh, 0);
-        fseek($this->fh, 0);
-        fwrite($this->fh, implode("\n", $this->lastwrite)."\n"); // A trailing newline is important! The official todo.txt CLI assumes one
+            ftruncate($this->fh, 0);
+            fseek($this->fh, 0);
+            fwrite($this->fh, implode("\n", $this->lastwrite)."\n"); // A trailing newline is important! The official todo.txt CLI assumes one
+        }
 
         if($unlock) $this->unlock();
     }

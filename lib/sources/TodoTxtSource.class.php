@@ -27,10 +27,9 @@ class TodoTxtSource implements Source {
 
     private $fh, $file, $filename;
     private function __construct($filename) {
-        $this->fh = fopen($filename, 'r+');
         $this->filename = $filename;
 
-        $this->file = new TodoTxtFile($this->fh);
+        $this->file = new TodoTxtFile($this->filename);
         $this->file->lock();
 
         $this->load();
@@ -74,13 +73,13 @@ class TodoTxtSource implements Source {
      */
     public function getAll() {
 
-	$out = array();
+	    $out = array();
 
-	// Hide hidden tasks
-	foreach($this->tasks as $t) {
-	    if(!$t->isCompleted()) 
-		$out[] = $t;
-	}
+    	// Hide hidden tasks
+    	foreach($this->tasks as $t) {
+    	    if(!$t->isCompleted())
+    		$out[] = $t;
+    	}
 
         return $out;
     }
@@ -102,11 +101,11 @@ class TodoTxtSource implements Source {
 
     public function create(Task $task) {
 
-	// Avoid creating duplicates - this can happen before clients pick up a fresh list with an ID assigned
-	foreach($this->tasks as $t) {
-		if($t->getTask() == $t->getTask())
-			return;
-	}
+    	// Avoid creating duplicates - this can happen before clients pick up a fresh list with an ID assigned
+    	foreach($this->tasks as $t) {
+    		if($t->getTask() == $task->getTask())
+    			return;
+    	}
 
         $id = uniqid(); // Create an ID
         $task->addMetadata(Syncer::METAIDFIELD, $id);

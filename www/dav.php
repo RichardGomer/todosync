@@ -30,6 +30,7 @@ class TodoDir extends DAV\Collection {
         if(preg_match('/\.tacitpart$/', $name)) {
             $fpath = dirname(__FILE__).'/temp/'.$name;
             touch($fpath);
+            chmod($fpath, 0777);
         }
 
         $f = $this->getChild($name);
@@ -38,7 +39,7 @@ class TodoDir extends DAV\Collection {
 
     function getChild($name) {
 
-        // Temp files get called .tacitfile by
+        // Temp files get called .tacitpart by clients that do safe uploads
         if(preg_match('/\.tacitpart$/', $name)) {
             $fpath = dirname(__FILE__).'/temp/'.$name;
 
@@ -135,16 +136,3 @@ $server->exec();
 sleep(1); // Time for sync process to process changes
 // TODO: Wait for some kind of confirmation?
 ob_end_flush();
-
-// Because of our hybrid virtual-real filesystem, we can end up with todo.txt and done.txt
-// existing in the temp directory (after being renamed from tempfile uploads)
-// We need to jusy copy them across and clean up
-foreach(scandir('temp') as $tf) {
-	//echo "TIDY $tf\n";
-	if($tf == 'done.txt' || $tf == 'todo.txt') {
-		$f = $publicDir->getChild($tf)->put(file_get_contents("temp/$tf"));
-	}
-
-	if(time() - filemtime("temp/$tf") > 60) // Remove old files (i.e. not while a client might be using them!)
-		unlink("temp/$tf");
-}

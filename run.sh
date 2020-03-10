@@ -6,5 +6,5 @@ cd "$(dirname "$0")" # Change to our parent directory
 
 if ! pgrep -u "$(whoami)" -f "php sync.php" # Check sync isn't already running
 then
-    php sync.php > sync.log &
+    php sync.php > sync.log 2>&1 &
 fi
