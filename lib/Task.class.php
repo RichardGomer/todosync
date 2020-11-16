@@ -40,7 +40,7 @@ class Task extends TaskItem {
     }
 
     public function isCompleted() {
-	return $this->getStatus() == TaskItem::STATUS_COMPLETED;
+	       return $this->getStatus() == TaskItem::STATUS_COMPLETED;
     }
 
 

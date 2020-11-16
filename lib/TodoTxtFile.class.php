@@ -15,6 +15,7 @@ class TodoTxtFile implements Log\LoggerAwareInterface {
         $this->fn = $filename;
         $this->getFileHandle();
         $this->lastwrite = $this->readLines();
+	$this->log = new Log\NullLogger();
     }
 
     public function __destroy() {
@@ -118,6 +119,7 @@ class TodoTxtFile implements Log\LoggerAwareInterface {
         $tasks = array();
         $parser = new \Gravitask\Task\Parser\TodoTxtParser();
         foreach($lines as $l) {
+	    if(strlen(trim($l)) == 0) continue; // Skip blank lines
             $tasks[] = Task::convert($parser->parse($l), $l);
         }
         return $tasks;
@@ -193,6 +195,12 @@ class TodoTxtFile implements Log\LoggerAwareInterface {
             ftruncate($this->fh, 0);
             fseek($this->fh, 0);
             fwrite($this->fh, implode("\n", $this->lastwrite)."\n"); // A trailing newline is important! The official todo.txt CLI assumes one
+        } else {
+            if(is_object($this->log)) {
+                $sl = strlen(implode("\n", $this->lastwrite));
+                $sn = strlen(implode("\n",$txt));
+                $this->log->debug("There are no changes to write to disk, skipping ({$sl}bytes vs {$sn}bytes)");
+            }
         }
 
         if($unlock) $this->unlock();

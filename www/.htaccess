@@ -1,8 +1,17 @@
+Header set Access-Control-Allow-Origin "http://localhost:1234"
+Header set Access-Control-Allow-Credentials true
+Header always set Access-Control-Allow-Headers "Accept, Authorization, Origin, Content-Type"
+Header always set Access-Control-Allow-Methods "GET,POST,DELETE,OPTIONS,PUT"
+
+
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule (.*) /dav.php [L]
 
-AuthType Basic
-AuthName "todosync"
-AuthUserFile /home/richard/public_html/todosync/www/.htpasswd
-Require valid-user
+
+<LimitExcept OPTIONS>
+	AuthType Basic
+	AuthName "todosync"
+	AuthUserFile /home/richard/public_html/todosync/www/.htpasswd
+	Require valid-user
+</LimitExcept>

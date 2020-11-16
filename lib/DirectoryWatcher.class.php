@@ -41,11 +41,23 @@ class DirectoryWatcher {
         $files = scandir($this->dirname);
         foreach($files as $f) {
             $ff = $this->dirname.'/'.$f;
-            if(is_file($ff) && fnmatch($this->fm, $f)) {
+
+            if(is_file($ff) && $this->match($f)) {
                 $fout[] = new TodoTxtFile($ff);
             }
         }
 
         return $fout;
+    }
+
+    protected function match($f) {
+
+        foreach(explode('|', $this->fm) as $m) {
+            if(fnmatch($m, $f)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

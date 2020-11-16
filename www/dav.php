@@ -27,7 +27,7 @@ class TodoDir extends DAV\Collection {
 
     function createFile($name, $data = null) {
 
-        if(preg_match('/\.tacitpart$/', $name)) {
+        if(preg_match('/\.(tmp|tacitpart)$/', $name)) {
             $fpath = dirname(__FILE__).'/temp/'.$name;
             touch($fpath);
             chmod($fpath, 0777);
@@ -40,7 +40,7 @@ class TodoDir extends DAV\Collection {
     function getChild($name) {
 
         // Temp files get called .tacitpart by clients that do safe uploads
-        if(preg_match('/\.tacitpart$/', $name)) {
+        if(preg_match('/\.(tmp|tacitpart)$/', $name)) {
             $fpath = dirname(__FILE__).'/temp/'.$name;
 
             if(file_exists($fpath)) {
@@ -92,6 +92,7 @@ class TodoFile extends DAV\File {
 
     function put($data) {
         file_put_contents($this->path, $data);
+	chmod(0777, $this->path);
     }
 
     function getSize() {

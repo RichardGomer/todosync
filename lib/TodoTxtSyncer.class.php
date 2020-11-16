@@ -44,6 +44,7 @@ class TodoTxtSyncer extends Syncer {
         // Add a directory watcher for POST'ed updates via WebDAV
         $this->log->notice("Watching directory $postdir for incoming changes");
         $this->postedfiles = new DirectoryWatcher($postdir, $log);
+        $this->postedfiles->setMask("*.tmp|*.txt"); // Try to process any files
     }
 
     /**

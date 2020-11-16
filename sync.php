@@ -6,6 +6,7 @@ namespace RichardGomer\todosync;
 require 'vendor/autoload.php';
 
 // Load our local libraries
+require 'lib/NullLogger.class.php';
 require 'lib/Task.class.php';
 require 'lib/TodoTxtFile.class.php';
 require 'lib/DirectoryWatcher.class.php';
